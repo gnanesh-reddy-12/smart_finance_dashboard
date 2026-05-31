@@ -13,10 +13,16 @@ FRONTEND_DIST = ROOT / "frontend" / "dist"
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-change-me-in-production")
 
-CORS_ORIGINS = os.environ.get(
-    "CORS_ORIGINS",
-    "http://localhost:5173,http://127.0.0.1:5173",
-).split(",")
+def _cors_origins() -> list[str]:
+    origins = os.environ.get(
+        "CORS_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173",
+    ).split(",")
+    vercel_url = os.environ.get("VERCEL_URL")
+    if vercel_url:
+        origins.append(f"https://{vercel_url}")
+    return [o.strip() for o in origins if o.strip()]
+
 
 USERS_FILE = BACKEND / "data" / "users.json"
 
@@ -33,7 +39,7 @@ CATEGORIES = [
 @app.after_request
 def add_cors_headers(response):
     origin = request.headers.get("Origin")
-    if origin and origin.strip() in [o.strip() for o in CORS_ORIGINS]:
+    if origin and origin.strip() in _cors_origins():
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type"

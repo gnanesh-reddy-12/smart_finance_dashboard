@@ -11,6 +11,17 @@ Salary-Prediction/
 └── ml_pipeline/       # Future ML features
 ```
 
+## Deploy on Vercel
+
+1. Push the repo to GitHub and import it in [Vercel](https://vercel.com/).
+2. **Root directory:** leave as repository root (not `frontend/`).
+3. **Environment variable:** add `SECRET_KEY` (any long random string).
+4. Redeploy after changes.
+
+Vercel runs `cd frontend && npm install && npm run build`, then serves the React app and API from `backend/app.py`. Do not use two separate Vercel projects for frontend and backend.
+
+**Note:** `backend/data/users.json` does not persist on serverless. Use PostgreSQL later for production users.
+
 ## Quick start (development)
 
 ```bash
