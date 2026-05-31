@@ -1,7 +1,13 @@
 {
   "version": 2,
-  "installCommand": "pip install -r requirements.txt && cd frontend && npm install && npm run build",
   "builds": [
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    },
     {
       "src": "backend/app.py",
       "use": "@vercel/python",
