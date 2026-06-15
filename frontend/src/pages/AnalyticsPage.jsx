@@ -337,7 +337,7 @@ const AnalyticsPage = () => {
               <h3 style={chartTitleStyle}>Income Distribution</h3>
               <p style={chartSubStyle}>Overall dataset split</p>
             </div>
-            <div style={{ height: '300px', position: 'relative' }}>
+            <div className="chart-wrapper" style={{ height: '300px' }}>
               <canvas ref={distChartRef}></canvas>
             </div>
           </div>
@@ -347,7 +347,7 @@ const AnalyticsPage = () => {
               <h3 style={chartTitleStyle}>Model Performance</h3>
               <p style={chartSubStyle}>Evaluation metrics on test set</p>
             </div>
-            <div style={{ height: '300px', position: 'relative' }}>
+            <div className="chart-wrapper" style={{ height: '300px' }}>
               <canvas ref={perfChartRef}></canvas>
             </div>
           </div>
@@ -359,7 +359,7 @@ const AnalyticsPage = () => {
             <h3 style={chartTitleStyle}>Income by Education Level</h3>
             <p style={chartSubStyle}>Percentage earning &gt;50K per education category</p>
           </div>
-          <div style={{ height: '280px', position: 'relative' }}>
+          <div className="chart-wrapper" style={{ height: '280px' }}>
             <canvas ref={eduChartRef}></canvas>
           </div>
         </div>
@@ -371,7 +371,7 @@ const AnalyticsPage = () => {
               <h3 style={chartTitleStyle}>Income by Occupation</h3>
               <p style={chartSubStyle}>% earning &gt;50K per job type</p>
             </div>
-            <div style={{ height: '340px', position: 'relative' }}>
+            <div className="chart-wrapper" style={{ height: '340px' }}>
               <canvas ref={occChartRef}></canvas>
             </div>
           </div>
@@ -381,7 +381,7 @@ const AnalyticsPage = () => {
               <h3 style={chartTitleStyle}>Income by Age Group</h3>
               <p style={chartSubStyle}>Distribution across age brackets</p>
             </div>
-            <div style={{ height: '340px', position: 'relative' }}>
+            <div className="chart-wrapper" style={{ height: '340px' }}>
               <canvas ref={ageChartRef}></canvas>
             </div>
           </div>
@@ -393,7 +393,7 @@ const AnalyticsPage = () => {
             <h3 style={chartTitleStyle}>Feature Importance</h3>
             <p style={chartSubStyle}>Top predictors from Random Forest model — higher score = stronger influence on prediction</p>
           </div>
-          <div style={{ height: '280px', position: 'relative' }}>
+          <div className="chart-wrapper" style={{ height: '280px' }}>
             <canvas ref={featChartRef}></canvas>
           </div>
         </div>
@@ -445,6 +445,13 @@ const AnalyticsPage = () => {
           display: grid;
           grid-template-columns: 1fr 1fr 1fr;
           gap: 24px;
+        }
+        .chart-grid-2 > div, .chart-grid-3 > div {
+          min-width: 0;
+        }
+        .chart-wrapper {
+          position: relative;
+          width: 100%;
         }
         @media (max-width: 900px) {
           .chart-grid-2, .chart-grid-3 {

@@ -23,12 +23,12 @@ const HomePage = () => {
         </p>
         
         <div className="hero-btn-row">
-          <Link to="/predict" style={{ textDecoration: 'none', width: '100%' }}>
+          <Link to="/predict" className="hero-link">
             <button className="btn hero-btn-primary">
               Start Predicting →
             </button>
           </Link>
-          <Link to="/analytics" style={{ textDecoration: 'none', width: '100%' }}>
+          <Link to="/analytics" className="hero-link">
             <button className="btn hero-btn-secondary">
               View Analytics
             </button>
@@ -148,7 +148,7 @@ const HomePage = () => {
           background: var(--bg-color);
           display: flex;
           flex-direction: column;
-          alignItems: center;
+          align-items: center;
           justify-content: center;
           min-height: calc(100vh - 80px);
           text-align: center;
@@ -189,13 +189,14 @@ const HomePage = () => {
           justify-content: center;
           margin-bottom: 3rem;
           width: 100%;
-          max-width: 500px;
+        }
+        .hero-link {
+          text-decoration: none;
         }
         .hero-btn-primary {
           padding: 16px 32px;
           font-size: 1.1rem;
           border-radius: 8px;
-          width: 100%;
         }
         .hero-btn-secondary {
           padding: 16px 32px;
@@ -204,7 +205,6 @@ const HomePage = () => {
           color: var(--primary);
           border: 1px solid var(--primary);
           border-radius: 8px;
-          width: 100%;
         }
         .hero-stats-row {
           display: flex;
@@ -325,7 +325,10 @@ const HomePage = () => {
         @media (max-width: 900px) {
           .hero-title { font-size: 2.5rem; }
           .hero-desc { font-size: 1.1rem; }
-          .hero-btn-row { flex-direction: column; }
+          
+          .hero-btn-row { flex-direction: column; max-width: 400px; margin-left: auto; margin-right: auto; }
+          .hero-link { width: 100%; }
+          .hero-btn-primary, .hero-btn-secondary { width: 100%; }
           
           .feature-grid { grid-template-columns: 1fr; }
           
