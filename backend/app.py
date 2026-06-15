@@ -78,23 +78,5 @@ def predict_income():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
-@app.route("/", defaults={"path": ""})
-@app.route("/<path:path>")
-def serve_react_app(path):
-    if path.startswith("api/"):
-        return jsonify({"error": "Not found"}), 404
-
-    if not FRONTEND_DIST.exists():
-        return jsonify(
-            {
-                "message": "React build not found. Run: cd frontend && npm install && npm run build. For dev use: npm run dev (port 5173).",
-            }
-        ), 503
-
-    if path and (FRONTEND_DIST / path).is_file():
-        return send_from_directory(FRONTEND_DIST, path)
-
-    return send_from_directory(FRONTEND_DIST, "index.html")
-
-if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)

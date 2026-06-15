@@ -10,20 +10,12 @@
     },
     {
       "src": "backend/app.py",
-      "use": "@vercel/python",
-      "config": {
-        "includeFiles": "frontend/dist/**"
-      }
+      "use": "@vercel/python"
     }
   ],
   "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "backend/app.py"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "backend/app.py"
-    }
+    { "src": "/api/(.*)", "dest": "/backend/app.py" },
+    { "src": "/assets/(.*)", "dest": "/frontend/dist/assets/$1" },
+    { "src": "/(.*)", "dest": "/frontend/dist/index.html" }
   ]
 }
