@@ -1,57 +1,46 @@
-# Smart Finance Dashboard
+# Smart Income Predictor
 
-Employee personal finance analyzer — **React** frontend + **Flask** API.
+A state-of-the-art machine learning web application that predicts whether an individual earns more than $50K per year or less, based on their demographic profile (Adult Census dataset). 
 
-## Project layout
+Built with **React (Vite)** for the frontend and **Flask** for the backend API, utilizing **Scikit-Learn** for the Machine Learning pipeline.
+
+## Project Structure
 
 ```text
-Salary-Prediction/
-├── backend/           # Flask API (auth, analyze)
-├── frontend/          # React + Vite (UI)
-└── ml_pipeline/       # Future ML features
+smart finance/
+├── adult 3.csv          # The raw Adult Census Dataset
+├── backend/             # Flask API backend
+│   ├── app.py           # Core backend handling prediction API
+│   └── requirements.txt # Python dependencies
+├── frontend/            # React + Vite frontend
+│   └── src/
+│       ├── pages/       # Modern Dashboard UI (Home, Predictor, Analytics)
+│       └── App.jsx      # Main React application with Toast alerts
+└── ml_pipeline/         # Machine learning training scripts
+    └── train_model.py   # Script to train Random Forest and save best_model.pkl
 ```
 
-## Deploy on Vercel
+## Setup Instructions
 
-1. Push the repo to GitHub and import it in [Vercel](https://vercel.com/).
-2. **Root directory:** leave as repository root (not `frontend/`).
-3. **Environment variable:** add `SECRET_KEY` (any long random string).
-4. Redeploy after changes.
-
-Vercel runs `cd frontend && npm install && npm run build`, then serves the React app and API from `backend/app.py`. Do not use two separate Vercel projects for frontend and backend.
-
-**Note:** `backend/data/users.json` does not persist on serverless. Use PostgreSQL later for production users.
-
-## Quick start (one command — local)
-
+### 1. Train the Machine Learning Model
+Before starting the servers, you must train the model using the provided CSV dataset.
 ```bash
 pip install -r backend/requirements.txt
-npm run start
+python ml_pipeline/train_model.py
 ```
+This will read `adult 3.csv`, train multiple classifiers, and output a `best_model.pkl` file in the `ml_pipeline` directory.
 
-This builds React, then starts Flask at [http://127.0.0.1:5000](http://127.0.0.1:5000).
-
-**If you see** `React build not found`, run `npm run build` once (or use `npm run start` instead of only `python backend/app.py`).
-
-## Quick start (development — live UI reload)
-
+### 2. Start the Backend API (Flask)
 ```bash
-pip install -r backend/requirements.txt
 python backend/app.py
 ```
+This starts the local server on `http://127.0.0.1:5000` which hosts the `/api/predict_income` endpoint.
 
-In another terminal:
-
+### 3. Start the Frontend (React)
+Open a new terminal window:
 ```bash
+cd frontend
+npm install
 npm run dev
 ```
-
-Open [http://localhost:5173](http://localhost:5173).
-
-## Pages (React)
-
-| Route | Screen |
-|-------|--------|
-| `/login` | Sign in |
-| `/register` | Create account |
-| `/dashboard` | Sidebar: Overview · Analyze month · Insights |
+Open your browser to `http://localhost:5173` to view the modern dashboard!
