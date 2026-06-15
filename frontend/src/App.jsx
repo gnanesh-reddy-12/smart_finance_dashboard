@@ -41,16 +41,26 @@ const ToastProvider = ({ children }) => {
 // Navigation Component
 const Navigation = () => {
   const location = useLocation();
+  const [isOpen, setIsOpen] = useState(false);
   
   return (
     <header className="app-header">
       <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-primary)' }}>
         Smart<span style={{ color: 'var(--primary)' }}>Income</span>
       </div>
-      <nav className="nav-links">
-        <Link to="/" className={location.pathname === '/' ? 'active' : ''}>Home</Link>
-        <Link to="/predict" className={location.pathname === '/predict' ? 'active' : ''}>Predictor</Link>
-        <Link to="/analytics" className={location.pathname === '/analytics' ? 'active' : ''}>Analytics</Link>
+      <button className="mobile-menu-btn" onClick={() => setIsOpen(!isOpen)}>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {isOpen ? (
+            <><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></>
+          ) : (
+            <><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></>
+          )}
+        </svg>
+      </button>
+      <nav className={`nav-links ${isOpen ? 'open' : ''}`}>
+        <Link to="/" onClick={() => setIsOpen(false)} className={location.pathname === '/' ? 'active' : ''}>Home</Link>
+        <Link to="/predict" onClick={() => setIsOpen(false)} className={location.pathname === '/predict' ? 'active' : ''}>Predictor</Link>
+        <Link to="/analytics" onClick={() => setIsOpen(false)} className={location.pathname === '/analytics' ? 'active' : ''}>Analytics</Link>
       </nav>
     </header>
   );
