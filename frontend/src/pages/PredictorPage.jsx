@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useToast } from '../App';
+import { useMetrics } from '../hooks/useMetrics';
 
 const getEduNum = (edu) => {
   const map = {
@@ -27,6 +28,7 @@ const defaultForm = {
 
 const PredictorPage = () => {
   const { addToast } = useToast();
+  const { metrics, loading: metricsLoading } = useMetrics();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [confidence, setConfidence] = useState(0);
@@ -167,7 +169,7 @@ const PredictorPage = () => {
             boxShadow: '0 0 0 2px rgba(16,185,129,0.2)',
             animation: 'pulse 2s infinite'
           }}></span>
-          ML Model Active · 86.7% Accuracy
+          ML Model Active · {metricsLoading ? '--' : `${(metrics?.best_metrics?.accuracy * 100).toFixed(1)}%`} Accuracy
         </div>
         
         <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#0F172A', marginBottom: '8px', letterSpacing: '-0.02em' }}>

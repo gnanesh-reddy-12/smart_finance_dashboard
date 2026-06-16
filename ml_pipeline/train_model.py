@@ -1,5 +1,5 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
+from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
@@ -11,6 +11,13 @@ import joblib
 import json
 import os
 from pathlib import Path
+
+try:
+    from xgboost import XGBClassifier
+    XGBOOST_AVAILABLE = True
+except ImportError:
+    XGBOOST_AVAILABLE = False
+    print("WARNING: xgboost not installed. Run: pip install xgboost. Skipping XGBClassifier.")
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_PATH = ROOT / "backend" / "data" / "adult 3.csv"
@@ -28,15 +35,15 @@ def main():
     df = df.dropna()
     df['income'] = df['income'].str.strip()
 
-    # Drop fnlwgt — census sampling weight, not a real feature
-    df = df.drop(columns=['fnlwgt'], errors='ignore')
+    # Drop fnlwgt and race — not real predictive features
+    df = df.drop(columns=['fnlwgt', 'race'], errors='ignore')
 
     X = df.drop("income", axis=1)
     y = df["income"]
 
     categorical_cols = [
         'workclass', 'education', 'marital-status', 'occupation',
-        'relationship', 'race', 'gender', 'native-country'
+        'relationship', 'gender', 'native-country'
     ]
     numerical_cols = [
         'age', 'educational-num', 'capital-gain',
@@ -49,18 +56,27 @@ def main():
     ])
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y  # stratify preserves class ratio
+        X, y, test_size=0.2, random_state=42, stratify=y
     )
+
+    # Map string labels to int for XGBoost compatibility
+    label_map = {'<=50K': 0, '>50K': 1}
+    y_train_enc = y_train.map(label_map)
+    y_test_enc = y_test.map(label_map)
 
     models = {
         "RandomForest": RandomForestClassifier(
             n_estimators=200,
-            class_weight='balanced',  # handles class imbalance
+            max_depth=20,
+            min_samples_leaf=2,
+            class_weight='balanced',
             random_state=42,
             n_jobs=-1
         ),
         "GradientBoosting": GradientBoostingClassifier(
             n_estimators=200,
+            learning_rate=0.05,
+            max_depth=5,
             random_state=42
         ),
         "LogisticRegression": LogisticRegression(
@@ -70,6 +86,16 @@ def main():
         ),
         "KNN": KNeighborsClassifier(n_jobs=-1),
     }
+
+    if XGBOOST_AVAILABLE:
+        models["XGBoost"] = XGBClassifier(
+            n_estimators=200,
+            learning_rate=0.05,
+            max_depth=6,
+            use_label_encoder=False,
+            eval_metric='logloss',
+            random_state=42
+        )
 
     results = {}
     pipelines = {}
@@ -82,13 +108,26 @@ def main():
             ('preprocessor', preprocessor),
             ('classifier', clf)
         ])
-        pipe.fit(X_train, y_train)
-        y_pred = pipe.predict(X_test)
-        y_proba = pipe.predict_proba(X_test)[:, 1] if hasattr(clf, 'predict_proba') else None
+
+        # XGBoost needs encoded labels
+        if name == "XGBoost":
+            pipe.fit(X_train, y_train_enc)
+            y_pred_enc = pipe.predict(X_test)
+            y_proba = pipe.predict_proba(X_test)[:, 1]
+            # Convert back to string labels for metrics
+            reverse_map = {0: '<=50K', 1: '>50K'}
+            y_pred = pd.Series(y_pred_enc).map(reverse_map).values
+        else:
+            pipe.fit(X_train, y_train)
+            y_pred = pipe.predict(X_test)
+            y_proba = pipe.predict_proba(X_test)[:, 1] if hasattr(clf, 'predict_proba') else None
 
         acc = accuracy_score(y_test, y_pred)
         f1 = f1_score(y_test, y_pred, pos_label='>50K')
-        auc = roc_auc_score(y_test, y_proba) if y_proba is not None else None
+        if name == "XGBoost":
+            auc = roc_auc_score(y_test_enc, y_proba)
+        else:
+            auc = roc_auc_score(y_test, y_proba) if y_proba is not None else None
 
         results[name] = f1  # rank by F1, not accuracy
         pipelines[name] = pipe
@@ -109,16 +148,16 @@ def main():
 
     joblib.dump(best_pipeline, MODEL_PATH)
 
-    # Save metrics so Flask API can serve them
+    # Save metrics — exact shape required by frontend useMetrics hook
     metrics_output = {
         "best_model": best_model_name,
-        "all_models": all_metrics,
-        "best_metrics": all_metrics[best_model_name]
+        "best_metrics": all_metrics[best_model_name],
+        "all_models": all_metrics
     }
     with open(METRICS_PATH, 'w') as f:
         json.dump(metrics_output, f, indent=2)
 
-    print(f"\n✅ Best Model: {best_model_name}")
+    print(f"\n[SUCCESS] Best Model: {best_model_name}")
     print(f"   F1: {all_metrics[best_model_name]['f1_score']} | AUC: {all_metrics[best_model_name]['roc_auc']}")
     print(f"   Saved to {MODEL_PATH}")
     print(f"   Metrics saved to {METRICS_PATH}")

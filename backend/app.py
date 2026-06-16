@@ -2,7 +2,6 @@ import os
 import json
 import logging
 from pathlib import Path
-from functools import lru_cache
 
 from flask import Flask, jsonify, request
 import joblib
@@ -17,7 +16,7 @@ METRICS_PATH = ROOT / "ml_pipeline" / "model_metrics.json"
 
 app = Flask(__name__)
 
-# Load once at startup, not per request
+# --- Startup: load model once ---
 def _load_model():
     if not MODEL_PATH.exists():
         raise FileNotFoundError(f"Model not found at {MODEL_PATH}. Run train_model.py first.")
@@ -38,9 +37,10 @@ except Exception as e:
     _metrics = {}
     logger.error(f"Model load failed: {e}")
 
+# --- Feature config ---
 EXPECTED_FEATURES = [
     'age', 'workclass', 'education', 'educational-num',
-    'marital-status', 'occupation', 'relationship', 'race',
+    'marital-status', 'occupation', 'relationship',
     'gender', 'capital-gain', 'capital-loss',
     'hours-per-week', 'native-country'
 ]
@@ -53,7 +53,6 @@ DEFAULTS = {
     'marital-status': 'Never-married',
     'occupation': 'Adm-clerical',
     'relationship': 'Unmarried',
-    'race': 'White',
     'gender': 'Male',
     'capital-gain': 0,
     'capital-loss': 0,
@@ -80,6 +79,34 @@ VALIDATION_RULES = {
     'educational-num': (1, 16),
 }
 
+# --- Module-level CORS constant (not called per-request) ---
+def _build_cors_origins() -> list:
+    raw = os.environ.get("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+    origins = [o.strip() for o in raw.split(",") if o.strip()]
+    vercel_url = os.environ.get("VERCEL_URL")
+    if vercel_url:
+        origins.append(f"https://{vercel_url}")
+    return origins
+
+CORS_ORIGINS = _build_cors_origins()
+
+# --- Rate limiting ---
+try:
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+    limiter = Limiter(
+        get_remote_address,
+        app=app,
+        default_limits=[],
+        storage_uri="memory://"
+    )
+    RATE_LIMITING_ENABLED = True
+except ImportError:
+    limiter = None
+    RATE_LIMITING_ENABLED = False
+    logger.warning("flask-limiter not installed. Rate limiting disabled.")
+
+# --- Helpers ---
 def _resolve_payload(payload: dict) -> dict:
     resolved = {}
     for key, value in payload.items():
@@ -87,7 +114,7 @@ def _resolve_payload(payload: dict) -> dict:
         resolved[canonical] = value
     return resolved
 
-def _validate(data: dict) -> list[str]:
+def _validate(data: dict) -> list:
     errors = []
     for field, (lo, hi) in VALIDATION_RULES.items():
         val = data.get(field)
@@ -106,18 +133,11 @@ def _build_dataframe(data: dict) -> pd.DataFrame:
         row[feature] = int(raw) if feature in INT_FIELDS else str(raw).strip()
     return pd.DataFrame([row])
 
-def _cors_origins() -> list[str]:
-    raw = os.environ.get("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
-    origins = [o.strip() for o in raw.split(",") if o.strip()]
-    vercel_url = os.environ.get("VERCEL_URL")
-    if vercel_url:
-        origins.append(f"https://{vercel_url}")
-    return origins
-
+# --- CORS ---
 @app.after_request
 def add_cors_headers(response):
     origin = request.headers.get("Origin", "")
-    if origin in _cors_origins():
+    if origin in CORS_ORIGINS:
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type"
@@ -128,18 +148,18 @@ def add_cors_headers(response):
 def api_options(_path):
     return "", 204
 
+# --- Routes ---
 @app.get("/api/health")
 def health():
     return jsonify({
         "status": "ok" if _model is not None else "degraded",
         "model_loaded": _model is not None,
-        "model_path": str(MODEL_PATH),
     })
 
 @app.get("/api/metrics")
 def metrics():
     if not _metrics:
-        return jsonify({"error": "Metrics not available. Run train_model.py first."}), 404
+        return jsonify({"error": "Metrics not found. Run train_model.py first."}), 404
     return jsonify(_metrics)
 
 @app.post("/api/predict_income")
@@ -166,6 +186,10 @@ def predict_income():
     except Exception as e:
         logger.exception("Prediction failed.")
         return jsonify({"error": "Prediction failed.", "detail": str(e)}), 400
+
+# Apply rate limit only if flask-limiter is available
+if RATE_LIMITING_ENABLED:
+    limiter.limit("100 per minute")(predict_income)
 
 if __name__ == "__main__":
     app.run(

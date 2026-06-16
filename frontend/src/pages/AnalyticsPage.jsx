@@ -1,7 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
+import { useMetrics } from '../hooks/useMetrics';
 
 const AnalyticsPage = () => {
+  const { metrics, loading, error } = useMetrics();
   // Chart refs
   const distChartRef = useRef(null);
   const perfChartRef = useRef(null);
@@ -78,7 +80,11 @@ const AnalyticsPage = () => {
         data: {
           labels: ['Accuracy', 'F1-Score', 'ROC-AUC'],
           datasets: [{
-            data: [86.7, 72.4, 91.2],
+            data: [
+              metrics ? (metrics.best_metrics.accuracy * 100).toFixed(1) : 0,
+              metrics ? (metrics.best_metrics.f1_score * 100).toFixed(1) : 0,
+              metrics ? (metrics.best_metrics.roc_auc * 100).toFixed(1) : 0
+            ],
             backgroundColor: ['#6366F1', '#7C3AED', '#10B981'],
             borderRadius: 6,
             barThickness: 32
@@ -240,7 +246,7 @@ const AnalyticsPage = () => {
       if (ageChart) ageChart.destroy();
       if (featChart) featChart.destroy();
     };
-  }, []);
+  }, [metrics]);
 
   return (
     <div style={{ fontFamily: 'Inter, sans-serif' }}>
@@ -308,7 +314,7 @@ const AnalyticsPage = () => {
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
             </div>
             <div>
-              <div style={{ fontSize: '32px', fontWeight: '700', color: '#7C3AED', lineHeight: '1.2' }}>86.7%</div>
+              <div style={{ fontSize: '32px', fontWeight: '700', color: '#7C3AED', lineHeight: '1.2' }}>{loading ? '--' : `${(metrics?.best_metrics?.accuracy * 100).toFixed(1)}%`}</div>
               <div style={{ fontSize: '13px', color: '#64748B', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Model Accuracy</div>
             </div>
           </div>
@@ -350,6 +356,11 @@ const AnalyticsPage = () => {
             <div className="chart-wrapper" style={{ height: '300px' }}>
               <canvas ref={perfChartRef}></canvas>
             </div>
+            {error && (
+              <p style={{ color: '#F43F5E', fontSize: '12px', marginTop: '8px' }}>
+                Could not load live metrics
+              </p>
+            )}
           </div>
         </div>
 

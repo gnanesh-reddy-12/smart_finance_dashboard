@@ -1,7 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useMetrics } from '../hooks/useMetrics';
 
 const HomePage = () => {
+  const { metrics, loading } = useMetrics();
   return (
     <div style={{ color: 'var(--text-primary)', fontFamily: 'Inter, sans-serif' }}>
       
@@ -19,7 +21,7 @@ const HomePage = () => {
         </h1>
         
         <p className="hero-desc">
-          AI-powered demographic analysis to forecast whether annual income exceeds $50,000 — trained on 48,842 real census records with 86.7% accuracy.
+          AI-powered demographic analysis to forecast whether annual income exceeds $50,000 — trained on 48,842 real census records with {loading ? '--' : `${(metrics?.best_metrics?.accuracy * 100).toFixed(1)}%`} accuracy.
         </p>
         
         <div className="hero-btn-row">
@@ -38,9 +40,9 @@ const HomePage = () => {
         <div className="hero-stats-row">
           <span>48,842 Records</span>
           <span className="hero-dot">•</span>
-          <span>86.7% Accuracy</span>
+          <span>{loading ? '--' : `${(metrics?.best_metrics?.accuracy * 100).toFixed(1)}%`} Accuracy</span>
           <span className="hero-dot">•</span>
-          <span>4 ML Models</span>
+          <span>{loading ? '--' : metrics?.best_model}</span>
         </div>
       </section>
 
@@ -118,7 +120,7 @@ const HomePage = () => {
               <div className="stat-label">Census records analyzed</div>
             </div>
             <div className="stat-block">
-              <div className="stat-value">86.7%</div>
+              <div className="stat-value">{loading ? '--' : `${(metrics?.best_metrics?.accuracy * 100).toFixed(1)}%`}</div>
               <div className="stat-label">Model accuracy</div>
             </div>
             <div className="stat-block">
