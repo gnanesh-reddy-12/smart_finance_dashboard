@@ -1,29 +1,123 @@
 import os
+import json
+import logging
 from pathlib import Path
-from flask import Flask, jsonify, request, send_from_directory
+from functools import lru_cache
+
+from flask import Flask, jsonify, request
 import joblib
 import pandas as pd
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 ROOT = Path(__file__).resolve().parent.parent
-BACKEND = Path(__file__).resolve().parent
-FRONTEND_DIST = ROOT / "frontend" / "dist"
+MODEL_PATH = ROOT / "ml_pipeline" / "best_model.pkl"
+METRICS_PATH = ROOT / "ml_pipeline" / "model_metrics.json"
 
 app = Flask(__name__)
 
+# Load once at startup, not per request
+def _load_model():
+    if not MODEL_PATH.exists():
+        raise FileNotFoundError(f"Model not found at {MODEL_PATH}. Run train_model.py first.")
+    return joblib.load(MODEL_PATH)
+
+def _load_metrics() -> dict:
+    if METRICS_PATH.exists():
+        with open(METRICS_PATH) as f:
+            return json.load(f)
+    return {}
+
+try:
+    _model = _load_model()
+    _metrics = _load_metrics()
+    logger.info("Model loaded successfully.")
+except Exception as e:
+    _model = None
+    _metrics = {}
+    logger.error(f"Model load failed: {e}")
+
+EXPECTED_FEATURES = [
+    'age', 'workclass', 'education', 'educational-num',
+    'marital-status', 'occupation', 'relationship', 'race',
+    'gender', 'capital-gain', 'capital-loss',
+    'hours-per-week', 'native-country'
+]
+
+DEFAULTS = {
+    'age': 30,
+    'workclass': 'Private',
+    'education': 'Bachelors',
+    'educational-num': 13,
+    'marital-status': 'Never-married',
+    'occupation': 'Adm-clerical',
+    'relationship': 'Unmarried',
+    'race': 'White',
+    'gender': 'Male',
+    'capital-gain': 0,
+    'capital-loss': 0,
+    'hours-per-week': 40,
+    'native-country': 'United-States'
+}
+
+INT_FIELDS = {'age', 'educational-num', 'capital-gain', 'capital-loss', 'hours-per-week'}
+
+FIELD_ALIASES = {
+    'educational_num': 'educational-num',
+    'marital_status': 'marital-status',
+    'capital_gain': 'capital-gain',
+    'capital_loss': 'capital-loss',
+    'hours_per_week': 'hours-per-week',
+    'native_country': 'native-country',
+}
+
+VALIDATION_RULES = {
+    'age': (17, 90),
+    'hours-per-week': (1, 99),
+    'capital-gain': (0, 99999),
+    'capital-loss': (0, 4356),
+    'educational-num': (1, 16),
+}
+
+def _resolve_payload(payload: dict) -> dict:
+    resolved = {}
+    for key, value in payload.items():
+        canonical = FIELD_ALIASES.get(key, key)
+        resolved[canonical] = value
+    return resolved
+
+def _validate(data: dict) -> list[str]:
+    errors = []
+    for field, (lo, hi) in VALIDATION_RULES.items():
+        val = data.get(field)
+        if val is not None:
+            try:
+                if not (lo <= int(val) <= hi):
+                    errors.append(f"{field} must be between {lo} and {hi}.")
+            except (TypeError, ValueError):
+                errors.append(f"{field} must be a number.")
+    return errors
+
+def _build_dataframe(data: dict) -> pd.DataFrame:
+    row = {}
+    for feature in EXPECTED_FEATURES:
+        raw = data.get(feature, DEFAULTS[feature])
+        row[feature] = int(raw) if feature in INT_FIELDS else str(raw).strip()
+    return pd.DataFrame([row])
+
 def _cors_origins() -> list[str]:
-    origins = os.environ.get(
-        "CORS_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173",
-    ).split(",")
+    raw = os.environ.get("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+    origins = [o.strip() for o in raw.split(",") if o.strip()]
     vercel_url = os.environ.get("VERCEL_URL")
     if vercel_url:
         origins.append(f"https://{vercel_url}")
-    return [o.strip() for o in origins if o.strip()]
+    return origins
 
 @app.after_request
 def add_cors_headers(response):
-    origin = request.headers.get("Origin")
-    if origin and origin.strip() in _cors_origins():
+    origin = request.headers.get("Origin", "")
+    if origin in _cors_origins():
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type"
@@ -34,49 +128,48 @@ def add_cors_headers(response):
 def api_options(_path):
     return "", 204
 
+@app.get("/api/health")
+def health():
+    return jsonify({
+        "status": "ok" if _model is not None else "degraded",
+        "model_loaded": _model is not None,
+        "model_path": str(MODEL_PATH),
+    })
+
+@app.get("/api/metrics")
+def metrics():
+    if not _metrics:
+        return jsonify({"error": "Metrics not available. Run train_model.py first."}), 404
+    return jsonify(_metrics)
+
 @app.post("/api/predict_income")
 def predict_income():
-    # Load model if not loaded yet (or loaded once at module level)
-    model_path = ROOT / "ml_pipeline" / "best_model.pkl"
-    if not model_path.exists():
-        return jsonify({"error": "Model not trained yet. Please run the training script first."}), 500
-    
-    try:
-        model = joblib.load(model_path)
-    except Exception as e:
-        return jsonify({"error": f"Failed to load model: {str(e)}"}), 500
+    if _model is None:
+        return jsonify({"error": "Model not loaded. Run train_model.py first."}), 503
 
-    payload = request.get_json(silent=True) or {}
-    
-    # Extract features matching the model's expected input
-    try:
-        input_df = pd.DataFrame([{
-            'age': int(payload.get('age', 30)),
-            'workclass': payload.get('workclass', 'Private'),
-            'fnlwgt': int(payload.get('fnlwgt', 150000)),
-            'education': payload.get('education', 'Bachelors'),
-            'educational-num': int(payload.get('educational-num', payload.get('educational_num', 9))),
-            'marital-status': payload.get('marital-status', payload.get('marital_status', 'Never-married')),
-            'occupation': payload.get('occupation', 'Adm-clerical'),
-            'relationship': payload.get('relationship', 'Unmarried'),
-            'race': payload.get('race', 'White'),
-            'gender': payload.get('gender', 'Male'),
-            'capital-gain': int(payload.get('capital-gain', payload.get('capital_gain', 0))),
-            'capital-loss': int(payload.get('capital-loss', payload.get('capital_loss', 0))),
-            'hours-per-week': int(payload.get('hours-per-week', payload.get('hours_per_week', 40))),
-            'native-country': payload.get('native-country', payload.get('native_country', 'United-States'))
-        }])
-        
-        prediction = model.predict(input_df)[0]
-        confidence = float(max(model.predict_proba(input_df)[0])) if hasattr(model, 'predict_proba') else 0.85
-        
-        return jsonify({
-            "prediction": str(prediction), 
-            "confidence": confidence,
-            "ok": True
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
+    payload = _resolve_payload(request.get_json(silent=True) or {})
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    errors = _validate(payload)
+    if errors:
+        return jsonify({"error": "Validation failed.", "details": errors}), 422
+
+    try:
+        input_df = _build_dataframe(payload)
+        prediction = str(_model.predict(input_df)[0])
+        confidence = (
+            float(max(_model.predict_proba(input_df)[0]))
+            if hasattr(_model, "predict_proba")
+            else None
+        )
+        return jsonify({"prediction": prediction, "confidence": confidence, "ok": True})
+
+    except Exception as e:
+        logger.exception("Prediction failed.")
+        return jsonify({"error": "Prediction failed.", "detail": str(e)}), 400
+
+if __name__ == "__main__":
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000)),
+        debug=os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    )
