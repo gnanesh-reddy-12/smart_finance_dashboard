@@ -21,8 +21,8 @@ except ImportError:
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_PATH = ROOT / "backend" / "data" / "adult 3.csv"
-MODEL_PATH = ROOT / "ml_pipeline" / "best_model.pkl"
-METRICS_PATH = ROOT / "ml_pipeline" / "model_metrics.json"
+MODEL_PATH = ROOT / "backend" / "model" / "best_model.pkl"
+METRICS_PATH = ROOT / "backend" / "model" / "model_metrics.json"
 
 def main():
     if not DATA_PATH.exists():

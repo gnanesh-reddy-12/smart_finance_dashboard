@@ -11,8 +11,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parent.parent
-MODEL_PATH = ROOT / "ml_pipeline" / "best_model.pkl"
-METRICS_PATH = ROOT / "ml_pipeline" / "model_metrics.json"
+MODEL_PATH = ROOT / "backend" / "model" / "best_model.pkl"
+METRICS_PATH = ROOT / "backend" / "model" / "model_metrics.json"
 
 app = Flask(__name__)
 
